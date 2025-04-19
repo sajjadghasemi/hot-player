@@ -1,0 +1,14 @@
+const PlayIcon = () => {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+    >
+      <path fill="currentColor" d="M8 5v14l11-7z"></path>
+    </svg>
+  );
+};
+
+export default PlayIcon;
