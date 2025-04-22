@@ -1,1 +1,79 @@
 @import 'tailwindcss';
+
+@theme {
+  --color-progress-bg: rgb(64, 64, 64);
+}
+
+input[type='range'].custom-player-volume {
+  background: linear-gradient(
+    to right,
+    var(--color-pink-700) 0%,
+    var(--color-pink-700) calc(var(--value, 0) * 100%),
+    var(--color-slate-500) calc(var(--value, 0) * 100%),
+    var(--color-slate-500) 100%
+  );
+  -webkit-appearance: none;
+  appearance: none;
+  height: 0.5rem;
+  border-radius: 1rem;
+  outline: none;
+}
+
+input[type='range'].custom-player-volume::-webkit-slider-runnable-track {
+  background: transparent;
+  border-radius: 1rem;
+  height: 0.5rem;
+}
+
+input[type='range'].custom-player-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--color-volume-progress);
+  border-radius: 1rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  position: relative;
+  bottom: 2.5px;
+  border: none;
+  background-color: white;
+}
+
+input[type='range'].custom-player-progress {
+  background: linear-gradient(
+    to right,
+    var(--color-pink-700) 0%,
+    var(--color-pink-700) calc(var(--value, 0) * 100%),
+    var(--color-progress-bg) calc(var(--value, 0) * 100%),
+    var(--color-progress-bg) 100%
+  );
+  -webkit-appearance: none;
+  appearance: none;
+  height: 0.6rem;
+  border-radius: 1rem;
+  outline: none;
+}
+
+input[type='range'].custom-player-progress::-webkit-slider-runnable-track {
+  background: transparent;
+  border-radius: 1rem;
+  height: 0.5rem;
+}
+
+input[type='range'].custom-player-progress::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--color-volume-progress);
+  border-radius: 1rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  position: relative;
+  bottom: 4px;
+  border: none;
+  background-color: white;
+}
+
+.player-custom-shadow {
+  -webkit-box-shadow: inset 0px -100px 50px 10px rgba(0, 0, 0, 0.8);
+  -moz-box-shadow: inset 0px -100px 50px 10px rgba(0, 0, 0, 0.8);
+  box-shadow: inset 0px -100px 50px 10px rgba(0, 0, 0, 0.8);
+}

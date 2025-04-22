@@ -11,6 +11,7 @@ import {
 import Hls from 'hls.js';
 import PlayerOverlay from './PlayerOverlay';
 import { VastData, VideoData } from '@/app/page';
+import AdsOverlay from './AdsOverlay';
 
 const Player = ({
   data,
@@ -20,21 +21,22 @@ const Player = ({
   vastData: VastData;
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [showAd, setShowAd] = useState(true);
-  const [adCanSkip, setAdCanSkip] = useState(false);
-  const [adVideoUrl, setAdVideoUrl] = useState<string | null>(null);
   const adVideoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [showAd, setShowAd] = useState(true);
+  const [adVideoUrl, setAdVideoUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [playBackRateSetting, setPlayBackRateSetting] = useState(false);
-  const [playBackRate, setPlayBackRate] = useState(1);
+  const [quality, setQuality] = useState('auto');
+  const [playbackRate, setPlaybackRate] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
+  const [volume, setVolume] = useState(0);
+  const [adDuration, setAdDuration] = useState(5);
+
+  console.log(data);
 
   const resetControlsTimeout = () => {
     if (hideControlsTimeout.current) {
@@ -64,21 +66,11 @@ const Player = ({
     if (videoRef.current) videoRef.current.currentTime += amount;
   };
 
-  const adjustVolume = (amount: number) => {
+  const adjustVolume = (value: number) => {
+    setVolume(value);
     if (videoRef.current) {
-      videoRef.current.volume = Math.min(
-        Math.max(videoRef.current.volume + amount, 0),
-        1
-      );
+      videoRef.current.volume = Math.min(Math.max(value, 0), 1);
     }
-  };
-
-  const handleProgress = () => {
-    if (!videoRef.current) return;
-    setCurrentTime(videoRef.current.currentTime);
-    setProgress(
-      (videoRef.current.currentTime / videoRef.current.duration) * 100
-    );
   };
 
   const handleLoadedMetadata = () => {
@@ -89,39 +81,11 @@ const Player = ({
     e.preventDefault();
   };
 
-  const openPlayBackSetting = () => {
-    setPlayBackRateSetting(!playBackRateSetting);
-  };
-
   const handlePlaybackRate = (rate: number) => {
     if (videoRef.current) {
       videoRef.current.playbackRate = rate;
     }
-    setPlayBackRate(rate);
-    setPlayBackRateSetting(false);
-  };
-
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60)
-      .toString()
-      .padStart(2, '0');
-    return `${minutes}:${seconds}`;
-  };
-
-  const handleDoubleTap = (
-    event: MouseEvent<HTMLVideoElement> | TouchEvent<HTMLVideoElement>
-  ) => {
-    const video = videoRef.current;
-    if (!video) return;
-    const rect = video.getBoundingClientRect();
-    const tapX =
-      'clientX' in event ? event.clientX : event.touches?.[0]?.clientX;
-    if (tapX !== undefined) {
-      const middle = rect.left + rect.width / 2;
-      tapX < middle ? skip(-10) : skip(10);
-      resetControlsTimeout();
-    }
+    setPlaybackRate(rate);
   };
 
   const handleFullscreenChange = () => {
@@ -190,51 +154,25 @@ const Player = ({
   };
 
   useEffect(() => {
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    const ac = new AbortController();
+    const { signal } = ac;
+    document.addEventListener('fullscreenchange', handleFullscreenChange, {
+      signal,
+    });
+    document.addEventListener(
+      'webkitfullscreenchange',
+      handleFullscreenChange,
+      { signal }
+    );
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange, {
+      signal,
+    });
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange, {
+      signal,
+    });
 
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener(
-        'webkitfullscreenchange',
-        handleFullscreenChange
-      );
-      document.removeEventListener(
-        'mozfullscreenchange',
-        handleFullscreenChange
-      );
-      document.removeEventListener(
-        'MSFullscreenChange',
-        handleFullscreenChange
-      );
-    };
-  }, []);
-
-  useEffect(() => {
-    const video = videoRef.current;
-
-    const handleWaiting = () => setIsLoading(true);
-
-    const handleCanPlay = () => {
-      setIsLoading(false);
-      setIsPlaying(true);
-      video?.play().catch((error) => {
-        console.log(error);
-      });
-    };
-
-    const handlePlay = () => setIsLoading(false);
-
-    video?.addEventListener('waiting', handleWaiting);
-    video?.addEventListener('canplay', handleCanPlay);
-    video?.addEventListener('play', handlePlay);
-
-    return () => {
-      video?.removeEventListener('waiting', handleWaiting);
-      video?.removeEventListener('canplay', handleCanPlay);
-      video?.removeEventListener('play', handlePlay);
+      ac.abort();
     };
   }, []);
 
@@ -262,20 +200,24 @@ const Player = ({
 
         case 'ArrowUp':
           event.preventDefault();
-          video.volume = Math.min(video.volume + 0.1, 1);
+          adjustVolume(Math.min(video.volume + 0.1, 1));
           resetControlsTimeout();
           break;
 
         case 'ArrowDown':
           event.preventDefault();
-          video.volume = Math.max(video.volume - 0.1, 0);
+          adjustVolume(Math.max(video.volume - 0.1, 0));
           resetControlsTimeout();
           break;
 
         case 'm':
         case 'M':
           event.preventDefault();
-          video.muted = !video.muted;
+          if (video.volume > 0) {
+            adjustVolume(0);
+          } else {
+            adjustVolume(1);
+          }
           resetControlsTimeout();
           break;
 
@@ -299,7 +241,9 @@ const Player = ({
   }, [togglePlayPause]);
 
   useEffect(() => {
-    const videoElement = videoRef.current;
+    const videoElementContainer = playerContainerRef.current;
+    const ac = new AbortController();
+    const { signal } = ac;
 
     const handleMouseMove = () => {
       resetControlsTimeout();
@@ -313,10 +257,14 @@ const Player = ({
       resetControlsTimeout();
     };
 
-    if (videoElement) {
-      videoElement.addEventListener('mousemove', handleMouseMove);
-      videoElement.addEventListener('click', handleClick);
-      videoElement.addEventListener('touchstart', handleTouchStart);
+    if (videoElementContainer) {
+      videoElementContainer.addEventListener('mousemove', handleMouseMove, {
+        signal,
+      });
+      videoElementContainer.addEventListener('click', handleClick, { signal });
+      videoElementContainer.addEventListener('touchstart', handleTouchStart, {
+        signal,
+      });
     }
 
     if (isPlaying) {
@@ -326,10 +274,8 @@ const Player = ({
     }
 
     return () => {
-      if (videoElement) {
-        videoElement.removeEventListener('mousemove', handleMouseMove);
-        videoElement.removeEventListener('click', handleClick);
-        videoElement.removeEventListener('touchstart', handleTouchStart);
+      if (videoElementContainer) {
+        ac.abort();
       }
       if (hideControlsTimeout.current) {
         clearTimeout(hideControlsTimeout.current);
@@ -349,6 +295,13 @@ const Player = ({
         const parser = new DOMParser();
         const xml = parser.parseFromString(xmlString, 'application/xml');
         const mediaFile = xml.querySelector('MediaFile');
+        const durationTag = xml.querySelector('Duration');
+        let durationSec = 5;
+        if (durationTag) {
+          const [h, m, s] = durationTag.textContent!.split(':').map(Number);
+          durationSec = (h || 0) * 3600 + (m || 0) * 60 + (s || 0);
+        }
+        setAdDuration(durationSec);
         if (mediaFile) {
           const cdata = mediaFile.textContent?.trim();
           if (cdata) setAdVideoUrl(cdata);
@@ -362,26 +315,42 @@ const Player = ({
     if (playPromise) {
       playPromise.catch((error) => {
         console.log(error);
-
-        // Autoplay might be blocked, show a play button if needed
-        // Optionally handle error here
       });
     }
   }, [adVideoUrl, showAd]);
 
   useEffect(() => {
-    if (showAd) return;
+    const video = videoRef.current;
+    if (!video) return;
+    const onVolumeChange = () => setVolume(video.volume);
+    video.addEventListener('volumechange', onVolumeChange);
+    return () => video.removeEventListener('volumechange', onVolumeChange);
+  }, []);
+
+  useEffect(() => {
     if (videoRef.current) {
-      if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(data.manifest);
-        hls.attachMedia(videoRef.current);
-        videoRef.current.play();
-      } else {
-        videoRef.current.src = data.manifest;
-      }
+      videoRef.current.playbackRate = playbackRate;
     }
-  }, [showAd, data.manifest]);
+  }, [playbackRate]);
+
+  useEffect(() => {
+    if (showAd) return;
+    if (!videoRef.current) return;
+
+    const manifestUrl = data.manifest;
+
+    if (Hls.isSupported()) {
+      const hls = new Hls();
+      hls.loadSource(manifestUrl);
+      hls.attachMedia(videoRef.current);
+      videoRef.current.play();
+      setIsPlaying(true);
+      videoRef.current.muted = false;
+      adjustVolume(0.5);
+    } else {
+      videoRef.current.src = manifestUrl;
+    }
+  }, [showAd, quality, data.manifest]);
 
   const handleAdEnd = () => setShowAd(false);
   const handleSkipAd = () => setShowAd(false);
@@ -393,40 +362,26 @@ const Player = ({
       onContextMenu={handleContextMenu}
     >
       {showAd ? (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black">
-          {adVideoUrl ? (
-            <video
-              ref={adVideoRef}
-              src={adVideoUrl}
-              autoPlay
-              muted
-              className="w-full aspect-video"
-              onEnded={handleAdEnd}
-              controls={false}
-            />
-          ) : (
-            <div className="text-white">در حال بارگذاری تبلیغ...</div>
-          )}
-          <div className="absolute bottom-8 right-8">
-            {adCanSkip && (
-              <button
-                onClick={handleSkipAd}
-                className="bg-white text-black px-4 py-2 rounded"
-              >
-                {vastData.button_text || 'Skip Ad'}
-              </button>
-            )}
-          </div>
-        </div>
+        <AdsOverlay
+          adVideoUrl={adVideoUrl}
+          adDuration={adDuration}
+          vastData={vastData}
+          onSkip={handleSkipAd}
+          onEnded={handleAdEnd}
+          adVideoRef={adVideoRef}
+        />
       ) : (
         <>
           <video
             ref={videoRef}
             className="w-full aspect-video"
-            onDoubleClick={handleDoubleTap}
-            onTimeUpdate={handleProgress}
             onLoadedMetadata={handleLoadedMetadata}
             tabIndex={1}
+            onTimeUpdate={() => {
+              if (videoRef.current) {
+                setCurrentTime(videoRef.current.currentTime);
+              }
+            }}
             onMouseDown={() => handlePlaybackRate(2)}
             onMouseUp={() => handlePlaybackRate(1)}
             onTouchStart={() => handlePlaybackRate(2)}
@@ -437,21 +392,25 @@ const Player = ({
             <track />
           </video>
           <PlayerOverlay
+            vtt={data.storyboard_vtt}
             show={showControls}
             title={data.title}
             isPlaying={isPlaying}
             onPlayPause={togglePlayPause}
             onSkip={skip}
-            progress={progress}
             duration={duration}
             currentTime={currentTime}
             isFullscreen={isFullscreen}
             onToggleFullscreen={toggleFullscreen}
-            volume={videoRef.current?.volume || 0}
+            volume={volume}
             onVolumeChange={adjustVolume}
             onSeek={(time) => {
               if (videoRef.current) videoRef.current.currentTime = time;
             }}
+            quality={quality}
+            setQuality={setQuality}
+            playbackRate={playbackRate}
+            setPlaybackRate={setPlaybackRate}
           />
         </>
       )}
