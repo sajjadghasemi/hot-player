@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  useRef,
-  useState,
-  useEffect,
-  MouseEvent,
-  TouchEvent,
-  MouseEventHandler,
-} from 'react';
+import { useRef, useState, useEffect, MouseEventHandler } from 'react';
 import Hls from 'hls.js';
 import PlayerOverlay from './PlayerOverlay';
 import { VastData, VideoData } from '@/app/page';
@@ -24,6 +17,7 @@ const Player = ({
   const adVideoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimeout = useRef<NodeJS.Timeout | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const [showAd, setShowAd] = useState(true);
   const [adVideoUrl, setAdVideoUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -35,8 +29,6 @@ const Player = ({
   const [showControls, setShowControls] = useState(true);
   const [volume, setVolume] = useState(0);
   const [adDuration, setAdDuration] = useState(5);
-
-  console.log(data);
 
   const resetControlsTimeout = () => {
     if (hideControlsTimeout.current) {
@@ -334,23 +326,45 @@ const Player = ({
   }, [playbackRate]);
 
   useEffect(() => {
+    if (!hlsRef.current) return;
+    if (quality === 'auto') {
+      hlsRef.current.currentLevel = -1;
+    } else {
+      const levelIndex = hlsRef.current.levels.findIndex(
+        (level) => `${level.height}p` === quality
+      );
+      if (levelIndex !== -1) {
+        hlsRef.current.currentLevel = levelIndex;
+      }
+    }
+  }, [quality]);
+
+  useEffect(() => {
     if (showAd) return;
     if (!videoRef.current) return;
 
-    const manifestUrl = data.manifest;
-
     if (Hls.isSupported()) {
       const hls = new Hls();
-      hls.loadSource(manifestUrl);
+      hlsRef.current = hls;
+      hls.loadSource(data.manifest);
       hls.attachMedia(videoRef.current);
-      videoRef.current.play();
-      setIsPlaying(true);
-      videoRef.current.muted = false;
-      adjustVolume(0.5);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (videoRef.current) {
+          videoRef.current.play();
+          setIsPlaying(true);
+          videoRef.current.muted = false;
+          adjustVolume(0.5);
+        }
+      });
     } else {
-      videoRef.current.src = manifestUrl;
+      videoRef.current.src = data.manifest;
     }
-  }, [showAd, quality, data.manifest]);
+
+    return () => {
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+    };
+  }, [showAd, data.manifest]);
 
   const handleAdEnd = () => setShowAd(false);
   const handleSkipAd = () => setShowAd(false);
